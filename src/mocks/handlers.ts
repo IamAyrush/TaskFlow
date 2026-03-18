@@ -2,10 +2,29 @@ import { rest } from 'msw';
 import { MOCK_USER, MOCK_TOKEN, MOCK_CREDENTIALS, INITIAL_TASKS } from './data';
 import type { Task, CreateTaskPayload, UpdateTaskPayload } from '../types';
 
-let tasks: Task[] = [...INITIAL_TASKS];
+const STORAGE_KEY = 'taskflow_tasks';
+
+const loadTasks = (): Task[] => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) return JSON.parse(saved) as Task[];
+  } catch {
+    // ignore
+  }
+  return [...INITIAL_TASKS];
+};
+
+const saveTasks = (tasks: Task[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+  } catch {
+    // ignore
+  }
+};
+
+let tasks: Task[] = loadTasks();
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
-
 
 export const handlers = [
   rest.post('/api/login', async (req, res, ctx) => {
@@ -39,6 +58,7 @@ export const handlers = [
       updatedAt: new Date().toISOString(),
     };
     tasks.push(newTask);
+    saveTasks(tasks);
     return res(ctx.status(201), ctx.json(newTask));
   }),
 
@@ -55,6 +75,7 @@ export const handlers = [
       return res(ctx.status(404), ctx.json({ message: 'Task not found' }));
     }
     tasks[idx] = { ...tasks[idx], ...body, updatedAt: new Date().toISOString() };
+    saveTasks(tasks);
     return res(ctx.status(200), ctx.json(tasks[idx]));
   }),
 
@@ -69,8 +90,12 @@ export const handlers = [
       return res(ctx.status(404), ctx.json({ message: 'Task not found' }));
     }
     tasks = tasks.filter(t => t.id !== id);
+    saveTasks(tasks);
     return res(ctx.status(204));
   }),
 ];
 
-export const resetTasks = () => { tasks = [...INITIAL_TASKS]; };
+export const resetTasks = () => {
+  tasks = [...INITIAL_TASKS];
+  saveTasks(tasks);
+};
